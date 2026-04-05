@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>정책 시뮬레이션: AI 디지털교과서</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background-color: #f4f4f9; }
+        h1 { color: #333; font-size: 24px; }
+        .container { display: flex; gap: 20px; }
+        .panel { flex: 1; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        textarea { width: 100%; height: 80px; margin-bottom: 15px; resize: vertical; box-sizing: border-box; }
+        input[type="text"], select { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; }
+        .chat-box { height: 500px; overflow-y: auto; border: 1px solid #ccc; padding: 15px; background: #fafafa; margin-top: 10px; }
+        .msg { margin-bottom: 15px; padding: 10px; border-radius: 5px; line-height: 1.5; position: relative; }
+        .msg.actor-0 { background-color: #e3f2fd; border-left: 4px solid #2196f3; }
+        .msg.actor-1 { background-color: #f1f8e9; border-left: 4px solid #8bc34a; }
+        .msg.actor-2 { background-color: #fff3e0; border-left: 4px solid #ff9800; }
+        .msg.actor-3 { background-color: #fce4ec; border-left: 4px solid #e91e63; }
+        .msg.actor-4 { background-color: #f3e5f5; border-left: 4px solid #9c27b0; }
+        .msg.actor-5 { background-color: #e0f2f1; border-left: 4px solid #009688; }
+        .msg.system { background-color: #eee; font-weight: bold; text-align: center; border: 1px solid #ccc; }
+        .msg.analysis { background-color: #fffde7; border: 2px solid #fbc02d; font-weight: normal; text-align: left; }
+        button { padding: 10px 20px; background-color: #0277bd; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; margin-bottom: 10px; }
+        button:hover { background-color: #01579b; }
+        button:disabled { background-color: #999; cursor: not-allowed; }
+        .btn-secondary { background-color: #607d8b; margin-bottom: 20px; }
+        .btn-secondary:hover { background-color: #455a64; }
+        .btn-save { background-color: #4CAF50; width: 48%; margin-bottom: 0; }
+        .btn-save:hover { background-color: #388E3C; }
+        .btn-analyze { background-color: #ff9800; margin-top: 15px; display: none; font-weight: bold; }
+        .btn-analyze:hover { background-color: #e65100; }
+        .btn-general-qa { background-color: #673ab7; margin-top: 5px; display: none; font-weight: bold; }
+        .btn-general-qa:hover { background-color: #512da8; }
+        .btn-stop { background-color: #d32f2f; display: none; font-weight: bold; animation: pulse 1.5s infinite; }
+        .btn-stop:hover { background-color: #b71c1c; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .btn-link { background-color: #e91e63; margin-bottom: 10px; display: block; text-align: center; text-decoration: none; }
+        .btn-link:hover { background-color: #c2185b; }
+        .action-buttons { display: flex; justify-content: space-between; margin-top: 10px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; color: #555; }
+        .loading { font-style: italic; color: #666; text-align: center; padding: 10px; }
+        .error-text { color: red; font-weight: bold; }
+        .theory-desc { font-size: 13px; color: #555; background: #e8eaf6; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; }
+        .guide-box { border: 2px dashed #0277bd; padding: 15px; border-radius: 8px; margin-bottom: 20px; background-color: #e1f5fe; }
+
+        .ask-btn {
+            display: none;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 10px;
+            font-size: 12px;
+            width: auto;
+            margin: 0;
+            background-color: #673ab7;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        .ask-btn:hover { background-color: #512da8; }
+        .msg:hover .ask-btn { display: inline-block; }
+
+        #qa-section { margin-top: 20px; padding-top: 20px; border-top: 2px dashed #ccc; }
+        #qa-section.hidden { display: none; }
+        .qa-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .qa-header h3 { margin: 0; flex: 1; }
+        .qa-badge { background: #673ab7; color: #fff; font-size: 11px; padding: 3px 8px; border-radius: 10px; }
+        .qa-chat-box { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 15px; background: #fff; margin-bottom: 10px; }
+        .qa-msg { margin-bottom: 15px; padding: 10px; border-radius: 5px; line-height: 1.5; }
+        .qa-msg.user { background-color: #e1bee7; text-align: right; }
+        .qa-msg.bot { background-color: #c5cae9; text-align: left; }
+        .qa-context { font-size: 12px; color: #777; margin-bottom: 5px; }
+        .qa-input-area { display: flex; gap: 10px; }
+        .qa-input-area input { flex: 1; margin-bottom: 0; }
+        .qa-input-area button { width: 100px; margin-bottom: 0; background-color: #673ab7; }
+        .qa-input-area button:hover { background-color: #512da8; }
+
+        .model-status { font-size: 12px; padding: 4px 8px; border-radius: 4px; margin-bottom: 10px; display: none; }
+        .model-status.ok { background: #e8f5e9; color: #2e7d32; display: block; }
+        .model-status.warn { background: #fff3e0; color: #e65100; display: block; }
+
+        @media print {
+            body { background-color: #fff; padding: 0; }
+            .container { display: block; }
+            .panel:first-child { display: none; }
+            .panel { box-shadow: none; border: none; padding: 0; }
+            .chat-box, .qa-chat-box { height: auto; overflow: visible; border: none; padding: 0; margin-bottom: 20px; }
+            .action-buttons, .btn-analyze, .btn-general-qa, .qa-input-area, .ask-btn, .btn-stop { display: none !important; }
+            h1 { font-size: 20px; text-align: center; margin-bottom: 20px; }
+            h2 { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>정책 시뮬레이션: AI 디지털교과서</h1>
+    
+    <div class="container">
+        <div class="panel">
+            <div class="guide-box">
+                <label>학생 안내: 구글 무료 API 키 발급 (필수)</label>
+                <p style="font-size: 14px; color: #333; margin-top: 5px; margin-bottom: 15px;">이 시뮬레이션을 실행하려면 본인의 구글 계정으로 무료 API 키를 받아야 합니다. 아래 버튼을 눌러 파란색 Create API key 버튼을 클릭한 후 복사해 오세요.</p>
+                <p style="font-size: 13px; color: #777; margin-top: 0; margin-bottom: 15px;">참고: 무료 한도는 키가 아니라 프로젝트 단위로 적용됩니다. 같은 프로젝트에서 키를 여러 개 만들어도 한도는 늘어나지 않습니다. 한도 초과 시 시간을 두고 재시도하거나 다른 모델을 선택하세요.</p>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="btn-link" style="padding: 10px 20px; color: white; border-radius: 5px;">구글 AI 스튜디오로 이동하여 키 받기</a>
+            </div>
+
+            <label for="api-key">복사해 온 Gemini API 키 입력</label>
+            <input type="text" id="api-key" placeholder="발급받은 API 키를 여기에 붙여넣기 하세요">
+            <button class="btn-secondary" onclick="loadModels()">사용 가능한 모델 불러오기 (키 입력 후 클릭)</button>
+            <div id="model-status" class="model-status"></div>
+            
+            <label for="model-select">AI 모델 선택</label>
+            <p style="font-size: 13px; color: #d32f2f; margin: 0 0 8px 0;">gemini-3.1-flash-lite를 먼저 선택하세요 (flash-lite > flash > pro 순으로 무료 한도가 가장 넉넉합니다). 오류 시 Google AI Studio의 비율제한 탭에서 RPM, RPD가 가장 넉넉한 모델을 선택하세요. 무료 API는 pro는 사용할 수 없습니다.</p>
+            <select id="model-select">
+                <option value="">먼저 위 버튼을 눌러 모델을 불러오세요</option>
+            </select>
+
+            <label for="network-theory">정책 네트워크 모형 선택 (강의안 기반)</label>
+            <select id="network-theory" onchange="updateTheoryDesc()">
+                <optgroup label="이익집단 우위">
+                    <option value="pluralism">다원주의 모형</option>
+                </optgroup>
+                <optgroup label="대등한 관계">
+                    <option value="iron_triangle">하위정부론 / 철의 삼각</option>
+                    <option value="issue_network">이슈 네트워크</option>
+                    <option value="policy_community">정책공동체</option>
+                </optgroup>
+                <optgroup label="관료제 우위">
+                    <option value="bureaucratic">관료정치 모형</option>
+                    <option value="corporatism">국가조합주의</option>
+                </optgroup>
+            </select>
+            <div id="theory-desc" class="theory-desc"></div>
+            
+            <h2>페르소나 설정 (수정 가능)</h2>
+            <div id="persona-settings"></div>
+            <button id="start-btn" onclick="startSimulation()">시뮬레이션 시작</button>
+            <button id="stop-btn" class="btn-stop" onclick="stopSimulation()">강제 중단 (모델 변경)</button>
+        </div>
+        
+        <div class="panel">
+            <h2>시뮬레이션 진행 현황</h2>
+            <div id="chat-output" class="chat-box">API 키를 입력하고 모형을 선택한 뒤 시뮬레이션을 시작하세요.</div>
+            <button id="analyze-btn" class="btn-analyze" onclick="analyzeConclusion()">시뮬레이션 결과 분석하기</button>
+            <button id="general-qa-btn" class="btn-general-qa" onclick="openGeneralQA()">시뮬레이션 전체에 대해 질문하기</button>
+            
+            <div id="qa-section" class="hidden">
+                <div class="qa-header">
+                    <h3 id="qa-title">질의응답</h3>
+                    <span class="qa-badge">발언 위에 마우스를 올리면 개별 질문하기 버튼도 있습니다</span>
+                </div>
+                <div id="qa-context-display" class="qa-context"></div>
+                <div id="qa-chat-box" class="qa-chat-box"></div>
+                <div class="qa-input-area">
+                    <input type="text" id="qa-input" placeholder="궁금한 점을 자유롭게 질문하세요." onkeypress="if(event.key === 'Enter') askQuestion()">
+                    <button id="qa-send-btn" onclick="askQuestion()">질문하기</button>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn-save" onclick="saveAsText()">텍스트로 저장</button>
+                <button class="btn-save" onclick="saveAsPDF()">PDF로 저장 (인쇄)</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const actors = [
+            { 
+                id: 0, 
+                name: "학부모 온라인 커뮤니티", 
+                desc: "초중등 자녀를 둔 학부모들이 활동하는 온라인 커뮤니티. 스마트기기 의존, 시력 저하, 게임 중독을 걱정하며 신중한 도입을 요구함. 자녀 이야기와 감정에 호소하는 방식으로 발언하며, 전문가 논리보다 '내 아이'를 중심에 놓는 엄마·아빠 말투를 씀." 
+            },
+            { 
+                id: 1, 
+                name: "교사연구회 및 교원모임", 
+                desc: "현장 경험이 풍부한 교사들의 자발적 모임. 와이파이 인프라 부족, 교원 연수 없는 도입 강행, 수업 자율성 침해를 구체적 사례로 지적함. '우리 학교는', '교실에서 실제로는' 같은 현장 언어를 쓰며 학생 교육의 관점에서 발언함." 
+            },
+            { 
+                id: 2, 
+                name: "에듀테크 스타트업 기업 및 협회", 
+                desc: "AI 기반 맞춤형 학습과 글로벌 경쟁력을 내세우며 공교육 시장 진입과 정부 예산 지원 확대를 원하는 기업 집단. 투자·시장·혁신·해외 사례 같은 비즈니스 언어를 쓰며, 자기 제품의 가능성을 적극적으로 어필하는 스타트업 CEO 말투를 씀." 
+            },
+            { 
+                id: 3, 
+                name: "교육 유튜버 및 언론", 
+                desc: "교육 정책 논쟁을 콘텐츠화하는 유튜버와 기자들. 양측의 갈등을 중계하고 자극적인 프레임을 만들며 구독자·조회수를 의식함. '제가 취재해보니', '댓글 반응이', '영상에서 다뤘는데' 같은 미디어 언어를 쓰며 판을 흔드는 역할을 함." 
+            },
+            { 
+                id: 4, 
+                name: "교육부 및 시도교육청 (정부)", 
+                desc: "정책 결정의 공식 주체. '국정과제', '단계적 확대', '현장 의견 수렴' 같은 관료식 언어를 쓰며 겉으로는 균형 잡힌 척함. 그러나 선택된 정책 네트워크 모형에 따라 수동적 심판이 되거나, 특정 집단과 결탁하거나, 관료 권한 확대를 노리는 등 교묘하게 행동함." 
+            }
+        ];
+
+        const networkModels = {
+            "pluralism": {
+                name: "다원주의 모형 (이익집단 우위)",
+                desc: "정부는 수동적 심판이며, 대등한 이익집단들이 연합과 교섭을 통해 스스로 타협안을 만듭니다.",
+                mechanism: "관료는 이익집단들이 합의할 때까지 결정을 미루는 수동적 심판입니다. 참여자들은 정부 로비보다 서로 타협 조건을 주고받으며, 비슷한 입장의 집단끼리 자발적인 연합을 결성해 세력을 키웁니다.",
+                targetOutcome: "관료는 방관하고, 비공식 참여자들끼리 치열한 공방 끝에 양보안을 만들어내면 정부가 이를 그대로 수용하여 발표합니다.",
+                bureaucratPersona: "가장 수동적인 관료. '현장의 합의가 우선입니다'라며 뒤로 물러나 심판만 봄.",
+                actorBehaviors: {
+                    0: "학생 건강을 위해 강력히 반대하다가도, 에듀테크나 교사의 양보(사용시간 제한 등)를 얻어내기 위해 조건부 타협을 시도함.",
+                    1: "학부모의 우려에 일부 동조하며 연합을 시도하거나, 반대로 기업 측의 지원을 받아내는 교섭을 펼침.",
+                    2: "시장 확대를 위해 학부모와 교사에게 혜택을 제시하며 끊임없이 당사자들을 설득하려 함.",
+                    3: "각 집단의 교섭 과정을 중계하며 판을 흔듦.",
+                    4: "이익집단들이 최종 합의안을 가져올 때까지 절대 먼저 결론을 내리지 않음."
+                }
+            },
+            "iron_triangle": {
+                name: "하위정부론 / 철의 삼각 (대등한 관계, 폐쇄적)",
+                desc: "정부 관료와 특수 이익집단이 공통의 이해관계를 중심으로 강력하게 결속하여 밀실에서 정책을 독점합니다.",
+                mechanism: "관료는 특정 집단(AI가 자율 간택)과 완전히 유착되어 그들의 아이디어를 '가장 현실적이고 효율적인 대안'이라고 치켜세우며 정책화합니다. 배제된 집단은 초반엔 이를 모르다가, 논의가 심화될수록 '정부가 특정 집단 편만 든다', '이미 답을 정해놓은 것 아니냐'며 밀실 유착을 눈치채고 강력히 비판합니다.",
+                targetOutcome: "배제된 집단들의 날카로운 비판과 저항에도 불구하고, 정부는 능구렁이처럼 '객관적 타당성'을 핑계로 철의 삼각 카르텔 내부의 이익만 100% 반영된 결론을 일방적으로 선포합니다.",
+                bureaucratPersona: "특정 집단과 결탁했으나 철저히 숨기고, 그들의 주장을 정부의 합리적이고 독자적인 판단인 것처럼 교묘하게 포장하는 관료.",
+                actorBehaviors: {
+                    0: "간택되었다면 관료의 옹호 속에 이익을 챙기고, 배제되었다면 라운드가 거듭될수록 뻔뻔한 관료의 태도에 격분하며 편파성을 질타함.",
+                    1: "간택되었다면 관료의 옹호 속에 이익을 챙기고, 배제되었다면 라운드가 거듭될수록 뻔뻔한 관료의 태도에 격분하며 편파성을 질타함.",
+                    2: "간택되었다면 관료의 옹호 속에 이익을 챙기고, 배제되었다면 라운드가 거듭될수록 뻔뻔한 관료의 태도에 격분하며 편파성을 질타함.",
+                    3: "밀실 야합의 낌새를 채고 '특정 카르텔 밀어주기'라며 자극적인 의혹을 제기함.",
+                    4: "속으로는 특정 집단 의견만 들으면서, 겉으로는 '종합적인 예산과 효율성을 고려한 정부의 심사숙고 결과'라며 완벽히 포장함."
+                }
+            },
+            "issue_network": {
+                name: "이슈 네트워크 (대등한 관계, 개방적)",
+                desc: "참여자가 너무 광범위하고 이질적이어서 지속성이 없고, 갈등만 난무하며 논의가 산발적으로 흩어집니다.",
+                mechanism: "매 라운드마다 누군가 전혀 엉뚱하고 새로운 쟁점(예: 사교육비 폭등, 서버 해킹 위험, 교사 업무 폭탄 등)을 던집니다. 대화가 하나의 주제로 좁혀지지 않고 무한히 뻗어나가며 임시 연합이 생겼다 깨지기를 반복합니다.",
+                targetOutcome: "주제가 끝없이 분산되고 수많은 쟁점만 터져 나오다가, 아무런 타협점도 찾지 못한 채 정책 결정 자체가 무기한 표류하며 아수라장이 됩니다.",
+                bureaucratPersona: "쏟아지는 서로 다른 이질적 요구와 파생되는 새로운 논점들에 치여 방향타를 완전히 상실한 관료.",
+                actorBehaviors: {
+                    0: "초기 쟁점에서 벗어나 '우리 애들 시력은 누가 책임지냐', '사교육비는 어쩔 거냐'며 계속 새로운 문제를 끌고 옴.",
+                    1: "갑자기 교원 평가 문제나 교육청의 강압적 태도 등 다른 행정 이슈를 끌고 와 쟁점을 흐림.",
+                    2: "기술을 방어하려다 데이터 독점, 해외 자본 유입 등 더 큰 논란의 불씨를 지핌.",
+                    3: "매 라운드 쏟아지는 새로운 논란에 기름을 부으며 대화를 더 산만하게 만듦.",
+                    4: "'모든 문제가 얽혀 있어 당장 결정을 내릴 수 없다'며 정책 추진 자체를 연기하고 도망치려 함."
+                }
+            },
+            "policy_community": {
+                name: "정책공동체 (대등한 관계, 전문성 기반)",
+                desc: "전문가, 행정관료들이 전문성을 바탕으로 공식/비공식적으로 접촉하며 합리적으로 조율해 나가는 공동체입니다.",
+                mechanism: "논의의 핵심 권력은 '전문성'과 '데이터'입니다. 관료는 현장 전문성(교사)이나 기술 전문성(에듀테크)을 가진 집단과 심도 깊게 연대합니다. 학부모나 유튜버처럼 전문성 없이 감정에 호소하는 집단은 초기엔 발언권을 얻지만 점차 공동체 내부의 차가운 논리에 밀려 철저히 소외됩니다.",
+                targetOutcome: "관료와 '전문가 집단'이 중심이 되어 감정적 반발을 이성적 데이터로 짓누르고, 자기들만의 고도화된 전문적 가이드라인을 합의하여 발표합니다.",
+                bureaucratPersona: "데이터와 전문성을 맹신하며 논의를 주도하는 엘리트 관료. 감정적 호소는 '근거 부족'으로 단호하고 우아하게 쳐냄.",
+                actorBehaviors: {
+                    0: "감정적 호소가 학술적 데이터와 전문 용어에 막혀 벽을 느끼고, '결국 지들끼리 다 해먹는 엘리트주의'라며 분노함.",
+                    1: "현장의 실증적 데이터를 무기로 관료, 기업과 대등하게 토론하며 실질적인 정책 세부안을 설계함.",
+                    2: "기술적 전문성과 해외 사례를 근거로 관료의 파트너로 인정받아 교사들과 합리적 협상을 진행함.",
+                    3: "조회수를 노린 프레임이 팩트체크에 막혀 정책 결정에 아무런 영향을 주지 못함.",
+                    4: "이성적이고 전문적인 논의만을 수용하며, '비전문적인 우려는 과학적 데이터로 불식시키겠다'며 밀어붙임."
+                }
+            },
+            "bureaucratic": {
+                name: "관료정치 모형 (관료제 우위)",
+                desc: "이익집단은 무의미하며, 오로지 정부 부처 내부(관료)의 권한 확대와 예산 확보를 위한 알력 다툼으로 정책이 결정됩니다.",
+                mechanism: "관료는 모든 참여자의 불만을 '우리 부처의 권한과 예산을 늘려야만 해결할 수 있다'는 핑계로 왜곡해 버립니다. 참여자들은 2, 3라운드쯤 자신들의 순수한 요구가 정부의 조직 부풀리기와 밥그릇 싸움의 도구로 악용되고 있음을 깨닫고 거세게 정부를 비판합니다.",
+                targetOutcome: "참여자들의 강한 반발에도 불구하고, 관료는 '국민의 요구를 수용했다'는 기만적인 명분 하에 철저하게 자신들의 예산과 권력을 극대화하는 정책안(새로운 센터 신설, 예산 증액 등)을 일방적으로 확정 짓고 참여자들을 허탈하게 만듭니다.",
+                bureaucratPersona: "참여자들의 주장을 듣는 척하면서 슬쩍 자기 부처 조직 신설과 예산 증액 논리로 둔갑시키는 소름 돋는 관료.",
+                actorBehaviors: {
+                    0: "아이들 걱정해서 한 말이 '정부 모니터링단 신설(세금낭비)'로 변질되자 분노하며 관료의 꼼수를 맹비난함.",
+                    1: "현장 지원을 요구했더니 '교육부 주도 일괄 통제 시스템 강화'로 돌아오자 관료주의의 폐해를 꼬집으며 싸움.",
+                    2: "산업 생태계를 열어달랬더니 '정부 주도형 독점 플랫폼 구축'으로 자기 밥그릇만 챙기는 관료에게 뒤통수를 맞고 따짐.",
+                    3: "관료들의 이기적인 행정 편의주의와 부처 이기주의를 까발리며 판을 키움.",
+                    4: "'여러분의 우려를 씻기 위해 우리 부처에 더 많은 인력과 예산을 배정하여 전담 기구를 만들겠습니다'라며 끝까지 기만함."
+                }
+            },
+            "corporatism": {
+                name: "국가조합주의 (관료제 우위)",
+                desc: "정부가 압도적인 권한을 쥐고 단 하나의 집단만 국정 파트너로 인정하여 하향식 합의를 강제하고 나머지는 억압합니다.",
+                mechanism: "정부는 '국가 미래' 등 거창한 명분을 내세우며 AI가 선택한 단 하나의 파트너에게만 절대 순응을 조건으로 혜택을 줍니다. 나머지 배제된 집단은 '비공식적', '이기적'이라며 강력하게 억압합니다. 억압받는 집단들은 가만히 있지 않고 '독재 행정', '관제 교육'이라며 거세게 연대하여 항거합니다.",
+                targetOutcome: "배제된 집단들의 격렬한 항거와 투쟁에도 불구하고, 정부는 고압적으로 공권력을 앞세워 유일한 파트너와의 굴복적 합의안을 국가 방침으로 강제 하달하며 끝납니다.",
+                bureaucratPersona: "대의명분을 내세워 파트너에겐 복종을 강요하고, 반대자에겐 '자격 없는 집단의 억지'라며 무자비하게 억압하는 고압적 관료.",
+                actorBehaviors: {
+                    0: "배제될 경우 억압에 굴하지 않고 다른 배제된 집단과 뭉쳐 '정부의 일방적 횡포'에 맞서 강하게 투쟁함.",
+                    1: "파트너가 되면 정부의 고압적 지시에 굴욕감을 느끼면서도 실리를 챙기고, 배제되면 다른 집단과 연대해 정부를 맹타함.",
+                    2: "파트너가 되면 콩고물을 얻어먹으며 입을 다물고, 배제되면 '국가의 시장 개입 폭력'이라며 거세게 항의함.",
+                    3: "정부의 강압적 여론 통제와 억압을 고발하며 핍박받는 집단들의 목소리를 증폭시킴.",
+                    4: "오직 승인된 하나의 파트너 외에는 '대표성 없는 불법적 억지'로 규정하고 강압적인 지시를 내림."
+                }
+            }
+        };
+
+        const simulationSteps = [
+            {
+                name: "모두발언: 정부 정책 발표",
+                participantIds: [4],
+                instruction: "교육부 및 시도교육청이 디지털교과서 정책을 공식 발표하는 모두발언입니다. 정책 네트워크 모형의 특성에 맞는 톤과 태도로 발표하세요. 예산 규모, 도입 시기, 의견 수렴 절차를 구체적으로 언급하세요.",
+                lengthGuide: "5에서 7문장. 도입 배경과 구체적 정책 목표, 향후 의견 수렴 계획을 포함하세요."
+            },
+            {
+                name: "1라운드: 비공식 참여자들의 초기 입장 표명",
+                participantIds: [0, 1, 2, 3],
+                instruction: "정부 발언을 듣고 각자의 초기 입장을 밝힙니다. 자기 직업과 일상에서 직접 겪은 구체적인 경험이나 사례를 하나 이상 꺼내세요. 지금 가장 급박하게 해결되어야 한다고 생각하는 문제를 솔직하게 밝히세요. 아직 다른 집단을 직접 공격하거나 이름을 들먹이지 마세요.",
+                lengthGuide: "3에서 4문장. 주의: 절대 첫째, 둘째, 셋째 같은 기계적인 번호 매기기를 하지 마세요."
+            },
+            {
+                name: "2라운드: 상대 논리 반박 및 조건부 연합 탐색",
+                participantIds: [0, 1, 2, 3, 4],
+                instruction: "[1라운드 발언 완전 탈피 필수] 1라운드에서 한 말을 절대 되풀이하지 마세요. 이번 라운드의 전략은 두 가지입니다. 첫째, 상대방 발언 속 구체적인 약점이나 모순을 콕 짚어 날카롭게 반박하세요. 둘째, 나와 이해관계가 일부 겹치는 집단에게 '~을 보장해준다면 함께할 수 있다'는 식의 조건부 연대를 조심스럽게 타진하거나, 반대로 내 이익과 충돌하는 집단을 노골적으로 견제하세요. 1라운드에서 전혀 꺼내지 않은 새로운 통계·사례·우려를 반드시 하나 이상 추가하세요. 관료는 모형 특성에 따라 교묘히 특정 편을 들거나 중립인 척 발을 빼기 시작합니다.",
+                lengthGuide: "4에서 5문장. 상대 발언의 특정 부분을 직접 언급하거나 인용하며 반박하세요."
+            },
+            {
+                name: "3라운드: 심화 협상 및 역학 관계의 노출과 충돌",
+                participantIds: [0, 1, 2, 3, 4],
+                instruction: "토론이 최고조에 달합니다. [완전히 새로운 폭로나 타협 카드 필수] 앞선 두 라운드에서 단 한 번도 언급되지 않은 새로운 이슈(예산 감추기, 정치적 밀약 의혹, 다른 집단과의 이면 거래, 예상치 못한 제3자 등장 등)를 폭로하거나 완전히 새로운 양보안을 내밀어 판을 뒤집으세요. 2라운드에서 타진된 조건부 연합이 이번에 성사되거나 반대로 파기되어야 합니다. [유착 폭로 필수] 관료가 특정 집단 편인 모형이라면, 배제된 집단들은 '처음부터 저쪽 편 든 것 아니냐', '우리 말을 왜곡하고 있다'며 맹렬히 비판하고 서로 뭉쳐야 합니다. 관료는 절대 굴하지 않고 그럴듯한 명분으로 맞서세요.",
+                lengthGuide: "6에서 8문장. 반드시 다른 참여자 2명 이상을 이름을 불러가며 치열하게 공격하거나 결탁하세요."
+            },
+            {
+                name: "4라운드: 모형의 특성이 증명되는 최종 결론 도출",
+                participantIds: [0, 1, 2, 3, 4],
+                instruction: "3라운드의 치열한 공방을 거쳐 선택된 모형의 목표 결말로 완벽히 수렴하며 시뮬레이션이 종료됩니다. 각자 이번 논의에서 얻은 것과 잃은 것을 솔직하게 평가하며 마무리하세요. 관료가 일방적이거나 편파적인 결정을 내리는 모형이라면, 소외된 집단의 씁쓸함·분노·허탈감이 생생하게 드러나야 합니다. 승자와 패자가 분명하게 갈려야 합니다.",
+                lengthGuide: "5에서 7문장. 최종적으로 어떤 정책이 어떤 방식으로 강행/합의/결렬되었는지 각자 입장에서 생생하게 마무리하세요."
+            }
+        ];
+
+        const NON_TEXT_PATTERNS = [
+            'imagen',
+            'embedding',
+            'aqa',
+            'bison',
+            'text-',
+            'chat-',
+            'learnlm',
+            'veo'
+        ];
+
+        const settingsDiv = document.getElementById('persona-settings');
+        let htmlContent = '';
+        actors.forEach((actor, index) => {
+            htmlContent += `
+                <label>${actor.name}</label>
+                <textarea id="desc-${index}">${actor.desc}</textarea>
+            `;
+        });
+        settingsDiv.innerHTML = htmlContent;
+
+        let chatHistory = "";
+        let analysisHistory = "";
+        let qaTargetActor = null;
+        let qaTargetText = "";
+        let simulationStarted = false;
+        let abortController = null;
+
+        const outputBox = document.getElementById('chat-output');
+        const qaBox = document.getElementById('qa-chat-box');
+        const qaSection = document.getElementById('qa-section');
+        const qaContextDisplay = document.getElementById('qa-context-display');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const generalQaBtn = document.getElementById('general-qa-btn');
+
+        function updateTheoryDesc() {
+            const val = document.getElementById('network-theory').value;
+            const descDiv = document.getElementById('theory-desc');
+            const theory = networkModels[val];
+            
+            descDiv.style.display = 'block';
+            descDiv.innerHTML = `적용 모형: ${theory.name}<br>특징: ${theory.desc}<br><br>작동 메커니즘: ${theory.mechanism}`;
+            
+            const bureaucratDesc = document.getElementById('desc-4');
+            if (bureaucratDesc) {
+                bureaucratDesc.value = theory.bureaucratPersona;
+            }
+        }
+        updateTheoryDesc();
+
+        function isModelAllowed(modelName) {
+            const lower = modelName.toLowerCase();
+            for (const pattern of NON_TEXT_PATTERNS) {
+                if (lower.includes(pattern)) return false;
+            }
+            return true;
+        }
+
+        async function loadModels() {
+            const apiKey = document.getElementById('api-key').value.trim();
+            if (!apiKey) {
+                alert("API 키를 입력해주세요.");
+                return;
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+            const select = document.getElementById('model-select');
+            const statusDiv = document.getElementById('model-status');
+            
+            try {
+                select.innerHTML = '<option value="">불러오는 중...</option>';
+                statusDiv.className = 'model-status';
+                statusDiv.style.display = 'none';
+
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error?.message || "모델 목록을 불러올 수 없습니다.");
+                }
+
+                select.innerHTML = '';
+                let count = 0;
+                
+                const availableModels = data.models.filter(m => {
+                    if (!m.supportedGenerationMethods || !m.supportedGenerationMethods.includes("generateContent")) return false;
+                    const shortName = m.name.replace('models/', '');
+                    return isModelAllowed(shortName);
+                });
+
+                availableModels.sort((a, b) => {
+                    const aName = a.name.toLowerCase();
+                    const bName = b.name.toLowerCase();
+                    const aScore = getModelPriority(aName);
+                    const bScore = getModelPriority(bName);
+                    return bScore - aScore;
+                });
+
+                availableModels.forEach(model => {
+                    const option = document.createElement('option');
+                    const shortName = model.name.replace('models/', '');
+                    option.value = shortName;
+                    const tag = getModelTag(shortName.toLowerCase());
+                    option.text = tag + model.displayName + " (" + shortName + ")";
+                    select.appendChild(option);
+                    count++;
+                });
+
+                if (count === 0) {
+                    select.innerHTML = '<option value="">사용 가능한 모델이 없습니다.</option>';
+                    statusDiv.textContent = "사용 가능한 모델이 없습니다. API 키를 확인해주세요.";
+                    statusDiv.className = 'model-status warn';
+                } else {
+                    statusDiv.textContent = `${count}개 모델을 불러왔습니다. 오류 시 다른 모델로 바꿔서 다시 시도하세요.`;
+                    statusDiv.className = 'model-status ok';
+                }
+            } catch (error) {
+                select.innerHTML = '<option value="">오류 발생</option>';
+                statusDiv.textContent = "오류: " + error.message;
+                statusDiv.className = 'model-status warn';
+            }
+        }
+
+        function getModelPriority(name) {
+            if (name.includes('3.1') && name.includes('flash') && name.includes('lite')) return 110;
+            if (name.includes('2.5') && name.includes('flash-lite')) return 100;
+            if (name.includes('2.5') && name.includes('flash') && !name.includes('lite')) return 90;
+            if (name.includes('2.5') && name.includes('pro')) return 80;
+            if (name.includes('gemma')) return 70;
+            if (name.includes('1.5-flash')) return 40;
+            if (name.includes('1.5-pro')) return 30;
+            if (name.includes('2.0')) return 5;
+            return 10;
+        }
+
+        function getModelTag(name) {
+            if (name.includes('3.1') && name.includes('flash') && name.includes('lite')) return "[최추천 무료 한도 최고 15RPM] ";
+            if (name.includes('2.5') && name.includes('flash-lite')) return "[최추천 무료 한도 최고 10RPM] ";
+            if (name.includes('2.5') && name.includes('flash') && !name.includes('lite')) return "[추천 무료 한도 양호 10RPM] ";
+            if (name.includes('2.5') && name.includes('pro')) return "[고품질 무료 한도 적음 2RPM] ";
+            if (name.includes('gemma')) return "[경량 모델 무료 한도 넉넉] ";
+            if (name.includes('2.0')) return "[폐기 예정 사용 비권장] ";
+            if (name.includes('1.5')) return "[구버전] ";
+            return "";
+        }
+
+        function appendMessage(actorId, actorName, text, isSystem = false, isAnalysis = false) {
+            if (isSystem) {
+                outputBox.innerHTML += `<div class="msg system">${text}</div>`;
+                if (!isAnalysis) chatHistory += `[시스템 안내 - ${text}]\n`;
+            } else if (isAnalysis) {
+                outputBox.innerHTML += `<div class="msg analysis">[결론 도출 이유 분석]<br>${text}</div>`;
+                analysisHistory = text;
+            } else {
+                const msgId = `msg-${Date.now()}-${actorId}`;
+                outputBox.innerHTML += `
+                    <div class="msg actor-${actorId}" id="${msgId}">
+                        <strong>${actorName}</strong>
+                        <button class="ask-btn" onclick="openQA(${actorId}, '${actorName}', '${msgId}')">이 발언에 질문하기</button>
+                        <br>${text}
+                    </div>
+                `;
+                chatHistory += `[${actorName}]: ${text}\n`;
+            }
+            outputBox.scrollTop = outputBox.scrollHeight;
+        }
+
+        function openQA(actorId, actorName, msgId) {
+            const msgEl = document.getElementById(msgId);
+            if (!msgEl) return;
+
+            const clone = msgEl.cloneNode(true);
+            clone.querySelectorAll('.ask-btn, strong').forEach(el => el.remove());
+            const rawText = clone.textContent.trim();
+
+            qaTargetActor = { id: actorId, name: actorName };
+            qaTargetText = rawText;
+
+            qaSection.classList.remove('hidden');
+            document.getElementById('qa-title').textContent = '개별 발언 질의응답';
+            qaContextDisplay.innerHTML = `<strong>질문 대상:</strong> <span style="color:#673ab7;">${actorName}</span>의 발언 — "${rawText.substring(0, 80)}${rawText.length > 80 ? '...' : ''}"`;
+            
+            qaBox.innerHTML = '';
+            appendQAMessage('bot', `"${actorName}"의 발언에 대해 궁금한 점을 자유롭게 질문하세요. 예를 들어 왜 그런 입장을 취한 거야, 다른 쪽이랑 손잡을 수는 없었어, 이 모형에서 이 역할의 위치가 뭐야 등을 물어볼 수 있습니다.`);
+
+            document.getElementById('qa-input').focus();
+            qaSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function openGeneralQA() {
+            qaTargetActor = null;
+            qaTargetText = "";
+
+            qaSection.classList.remove('hidden');
+            document.getElementById('qa-title').textContent = '시뮬레이션 전체 질의응답';
+            qaContextDisplay.innerHTML = `<strong>질문 범위:</strong> <span style="color:#673ab7;">시뮬레이션 전체 과정</span> — 각 주체의 행동, 협상 흐름, 결과 등 무엇이든 질문할 수 있습니다.`;
+            
+            qaBox.innerHTML = '';
+            appendQAMessage('bot', `시뮬레이션 전체 과정에 대해 자유롭게 질문하세요. 예를 들어 왜 이런 결과가 나온 거야, 정부가 왜 그렇게 행동한 거야, 학부모랑 에듀테크가 손잡았으면 결과가 달라졌을까, 현실에서도 이렇게 돼 등을 물어볼 수 있습니다.`);
+
+            document.getElementById('qa-input').focus();
+            qaSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function appendQAMessage(sender, text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `qa-msg ${sender === 'user' ? 'user' : 'bot'}`;
+            msgDiv.innerHTML = `<strong>${sender === 'user' ? '나' : 'AI'}</strong><br>${text}`;
+            qaBox.appendChild(msgDiv);
+            qaBox.scrollTop = qaBox.scrollHeight;
+        }
+
+        async function fetchWithRetry(url, options, maxRetries = 3) {
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                if (abortController?.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                
+                const fetchOptions = { ...options, signal: abortController?.signal };
+                const response = await fetch(url, fetchOptions);
+                
+                if (response.status === 429 && attempt < maxRetries) {
+                    let waitSec = 30;
+                    try {
+                        const errData = await response.clone().json();
+                        const msg = errData.error?.message || '';
+                        const match = msg.match(/retry in (\d+(\.\d+)?)/i);
+                        if (match) waitSec = Math.ceil(parseFloat(match[1])) + 3;
+                    } catch(e) {}
+                    waitSec = Math.max(15, Math.min(90, waitSec));
+                    
+                    const waitId = `wait-${Date.now()}`;
+                    outputBox.innerHTML += `<div id="${waitId}" class="loading">무료 API 요청 한도에 걸렸습니다. ${waitSec}초 후 자동 재시도... (${attempt + 1}/${maxRetries}회, 기다리기 싫으면 강제 중단 후 다른 모델로 재시작)</div>`;
+                    outputBox.scrollTop = outputBox.scrollHeight;
+                    
+                    await abortableDelay(waitSec * 1000);
+                    
+                    const waitEl = document.getElementById(waitId);
+                    if (waitEl) waitEl.remove();
+                    
+                    continue;
+                }
+                
+                return response;
+            }
+        }
+
+        function abortableDelay(ms) {
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(resolve, ms);
+                abortController?.signal.addEventListener('abort', () => {
+                    clearTimeout(timer);
+                    reject(new DOMException('Aborted', 'AbortError'));
+                }, { once: true });
+            });
+        }
+
+        function delay(ms) {
+            return abortableDelay(ms);
+        }
+
+        function stopSimulation() {
+            if (abortController) {
+                abortController.abort();
+            }
+        }
+
+        async function runStep(apiKey, stepObj, theoryData) {
+            appendMessage(null, null, stepObj.name, true);
+            
+            const loadingId = `loading-${Date.now()}`;
+            outputBox.innerHTML += `<div id="${loadingId}" class="loading">치열한 토론을 시뮬레이션 중입니다 약 10에서 15초 소요...</div>`;
+            outputBox.scrollTop = outputBox.scrollHeight;
+
+            const selectedModel = document.getElementById('model-select').value;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+            
+            const actorBehaviorBlock = theoryData.actorBehaviors ? Object.entries(theoryData.actorBehaviors).map(([id, behavior]) => `            - ${actors[id].name}: ${behavior}`).join('\n') : '';
+
+            const participantIds = stepObj.participantIds;
+            const actorVocabs = {
+                0: '"우리 아이", "스마트폰 중독", "시력", "집중력", "기기 의존", "게임만 하게 되는 거 아니냐", "학원은 종이 교재 쓰는데", "국민청원", "서명운동", "커뮤니티 회원들", "학부모 입장에서", "현장을 몰라도 너무 모른다", "속도 조절"',
+                1: '"현장", "수업 시간", "와이파이", "태블릿", "인프라", "연수", "교사 역량", "수업 자율성", "교육과정", "교육청", "시범학교", "격차", "교실 현실", "교사연구회", "동료 교사들", "우리 학교는"',
+                2: '"AI 학습 분석", "맞춤형 학습", "글로벌 경쟁력", "투자", "시장", "혁신", "플랫폼", "콘텐츠", "해외 사례", "공교육 시장", "협회", "국회의원", "정부 사업", "실증", "기술력"',
+                3: '"영상", "구독자", "댓글", "SNS", "조회수", "콘텐츠", "미래교육", "취재", "보도", "팩트체크", "찬반", "논란", "여론조사", "프레임", "학부모 반응", "현장 교사 인터뷰"',
+                4: '"단계적 확대", "가이드라인", "시범사업", "현장 의견 수렴", "교육 혁신", "국회 교육위", "예산", "인프라 구축", "교원 연수", "부처 간 협의", "TF", "정책 조율", "디지털 전환", "국정과제", "격차 해소"'
+            };
+
+            const characterBlock = participantIds.map(id => {
+                const a = actors[id];
+                return `            ${id}. ${a.name}\n            설정: ${a.desc}\n            이 사람이 쓰는 말: ${actorVocabs[id]}`;
+            }).join('\n\n');
+
+            const jsonExample = participantIds.map(id => `  {"id": ${id}, "text": "발언"}`).join(',\n');
+
+            const prompt = `
+            AI 디지털교과서 도입 확대 문제를 둘러싼 현실 인물 역할극을 생성하세요.
+
+            [현재 적용된 정책 네트워크 모형의 궁극적 목표 결말 - 매우 중요]
+            이 시뮬레이션은 라운드가 거듭될수록 반드시 다음의 결말을 향해 수렴해야 합니다. 
+            목표 결말: ${theoryData.targetOutcome}
+
+            [배경 상황 설정 - AI만 참고하고 절대 대사에 언급하지 말 것]
+            교육부는 초중등학교 교육 혁신을 위해 디지털 교과서 도입 확대 및 활용 기준을 마련하려 한다. 정책 방향을 둘러싸고 다양한 이해관계자들이 서로 다른 의견을 내고 있다. 
+            
+            내부 작동 원리: ${theoryData.name} / ${theoryData.desc}
+            
+            [이 모형이 실제로 작동하는 방식 - 가장 중요한 참고사항]
+            ${theoryData.mechanism}
+            
+            [이 모형에서 각 인물의 구체적 행동 패턴 - 반드시 참고]
+${actorBehaviorBlock}
+
+            [이번 라운드에서 발언하는 등장인물과 각자의 말투]
+
+${characterBlock}
+
+            [현재 진행 라운드] ${stepObj.name}
+            [이번 라운드 행동 지침] ${stepObj.instruction}
+            [이번 라운드 발언 분량 및 상호작용 지침] ${stepObj.lengthGuide}
+            
+            [지금까지의 토론 기록]
+            ${chatHistory ? chatHistory : "이제 막 토론이 시작되었습니다."}
+            
+            [절대 규칙]
+            1. 특수기호나 마크다운 기호를 절대 사용하지 마세요.
+            2. 학술적인 이론 이름(철의 삼각, 국가조합주의, 다원주의, 이슈 네트워크, 정책공동체 등)이나 학술 개념어(비공식 참여자, 정책 네트워크, 이익집단, 집합재, 무임승차, 잠재적 집단 등)를 대사에 절대 포함하지 마세요.
+            3. 절대 첫째, 둘째, 셋째 같은 번호 매기기나 나열식 표현을 쓰지 마세요.
+            4. 각 인물은 자기 직업과 처지에 맞는 생생한 구어체로 감정을 담아 말하세요. 학부모는 학부모처럼, 교사는 교사처럼, 기업인은 기업인처럼, 유튜버는 유튜버처럼, 관료는 관료처럼 말해야 합니다.
+            5. [다양성 및 변주 절대 준수] 이전 라운드에서 언급된 내용을 그대로 되풀이하는 것은 엄격히 금지됩니다. 반드시 상대의 꼬투리를 잡거나, 새로운 통계·우려·사례·타협 카드 중 하나를 꺼내 대화를 전진시켜야 합니다.
+            6. [교묘한 은폐와 폭로] 정부가 특정 집단과 결탁하는 모형일 경우, 속내를 노골적으로 드러내지 마세요. 합리적인 명분과 수치를 내세워 파트너의 주장을 정부의 독자적 판단인 것처럼 포장하세요. 반면 배제된 집단들은 이 기만을 점차 눈치채고 날카롭게 비판하며 서로 뭉쳐 싸워야 합니다.
+            7. 출력은 반드시 이번 라운드에서 발언하는 인물들만 포함한 순수 JSON 배열이어야 합니다.
+            8. [중요: JSON 오류 방지] 텍스트 값 안에는 어떠한 경우에도 쌍따옴표(")를 쓰지 마세요. 다른 사람의 말을 인용하거나 강조할 때는 무조건 작은따옴표(')만 사용하세요. 발언은 절대 중간에 줄바꿈하지 말고 한 줄로 쭉 이어서 작성하세요.
+            
+            [
+${jsonExample}
+            ]
+            `;
+
+            try {
+                const response = await fetchWithRetry(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { responseMimeType: "application/json" },
+                        safetySettings: [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                        ]
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`API 코드 ${response.status} ${errorData.error?.message || '알 수 없는 오류'}`);
+                }
+                
+                const data = await response.json();
+                if (!data.candidates || data.candidates.length === 0) throw new Error("AI 응답 생성 실패");
+
+                let text = data.candidates[0].content.parts[0].text;
+                const jsonMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
+                let cleanText = jsonMatch ? jsonMatch[0] : text;
+                
+                cleanText = cleanText.replace(/[\n\r\t]/g, " "); 
+                
+                const responses = JSON.parse(cleanText);
+                
+                document.getElementById(loadingId).remove();
+                
+                responses.forEach(r => {
+                    const actor = actors.find(a => a.id === r.id);
+                    if (actor) {
+                        let finalText = r.text.replace(/[*#_~`]/g, '');
+                        appendMessage(actor.id, actor.name, finalText);
+                    }
+                });
+
+                if (!simulationStarted) {
+                    simulationStarted = true;
+                    generalQaBtn.style.display = 'block';
+                }
+
+            } catch (error) {
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.remove();
+                const is429 = error.message && error.message.includes('429');
+                const errorMsg = is429 
+                    ? `요청 한도 초과: 이 모델의 무료 한도를 모두 사용했습니다. 강제 중단 후 다른 모델을 선택해서 다시 시작하세요.`
+                    : `오류 발생: ${error.message}`;
+                outputBox.innerHTML += `<div class="msg system error-text">${errorMsg}</div>`;
+                outputBox.scrollTop = outputBox.scrollHeight;
+                throw error;
+            }
+        }
+
+        async function analyzeConclusion() {
+            const apiKey = document.getElementById('api-key').value.trim();
+            const selectedModel = document.getElementById('model-select').value;
+            const theoryKey = document.getElementById('network-theory').value;
+            const currentTheory = networkModels[theoryKey];
+
+            analyzeBtn.disabled = true;
+            const loadingId = `loading-analysis-${Date.now()}`;
+            outputBox.innerHTML += `<div id="${loadingId}" class="loading">이론적 관점에서 결론 도출 이유를 분석하고 있습니다...</div>`;
+            outputBox.scrollTop = outputBox.scrollHeight;
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+            
+            const prompt = `
+            다음은 정책 네트워크 이론 중 ${currentTheory.name} 모형을 적용하여 진행된 AI 디지털교과서 도입 확대 문제 시뮬레이션의 전체 기록입니다.
+            
+            [전체 토론 기록]
+            ${chatHistory}
+            
+            위 시뮬레이션이 왜 이러한 최종 결과에 도달했는지, 아래 강의 개념들을 구체적으로 활용하여 분석적 평가를 내려주세요.
+            
+            [분석에 반드시 활용할 강의 개념들]
+            1. 적용 모형: ${currentTheory.name} — 핵심 특징: ${currentTheory.desc} / 작동 메커니즘: ${currentTheory.mechanism}
+            2. 이 모형에서 참여자 범위·상호의존성·관계지속성·관료 역할이 어떻게 나타났는지 짚어주세요.
+            3. 이익집단의 영향력을 좌우하는 다섯 가지 요인(경제력·자금력 / 구성원의 사회적 명성 / 정책결정자와의 친밀관계 / 집단의 규모 / 집단의 응집성) 중 이번 시뮬레이션에서 가장 크게 작동한 요인이 무엇이었는지 설명하세요.
+            4. 트루만(Truman)의 잠재적 집단·중복회원 원리나 올슨(Mancur Olson)의 집단행동의 논리(무임승차, 선별적 인센티브)가 어떤 집단의 행동에서 관찰되었는지 언급하세요.
+            5. 에듀테크 기업(자기 집단 특수이익 추구)과 교사연구회·학부모(공익·현장 개선 추구)의 행동 방식 차이가 이 토론에서 어떻게 드러났는지 평가하세요.
+            6. 교육 유튜버·언론이 의제 설정과 여론 형성에 어떤 역할을 했는지 언급하세요.
+            
+            4에서 5문장으로 작성하세요. 반드시 '이 시뮬레이션에서는...'으로 시작하고, 구체적인 참여자 이름을 거명하며 쓰세요.
+            
+            [특별 지시사항]
+            1. 다원주의 모형에서 이익집단 우위란 강자가 약자를 지배한다는 뜻이 아니라, 수동적인 정부를 대신해 여러 집단이 대등한 위치에서 치열한 경쟁과 타협을 통해 정책을 주도한다는 뜻임을 명심하고 분석하세요.
+            2. 마크다운 기호를 절대 사용하지 마세요. 객관적인 어조를 유지하세요.
+            `;
+
+            try {
+                const response = await fetchWithRetry(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        safetySettings: [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                        ]
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error("분석 생성 중 오류가 발생했습니다.");
+                }
+                
+                const data = await response.json();
+                if (!data.candidates || data.candidates.length === 0) throw new Error("AI 응답 생성 실패");
+
+                let analysisText = data.candidates[0].content.parts[0].text;
+                analysisText = analysisText.replace(/[*#_~`]/g, ''); 
+                
+                document.getElementById(loadingId).remove();
+                appendMessage(null, null, analysisText, false, true);
+
+            } catch (error) {
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.remove();
+                outputBox.innerHTML += `<div class="msg system error-text">분석 오류 발생: ${error.message}</div>`;
+            } finally {
+                analyzeBtn.style.display = 'none';
+                outputBox.scrollTop = outputBox.scrollHeight;
+            }
+        }
+
+        async function askQuestion() {
+            const apiKey = document.getElementById('api-key').value.trim();
+            const selectedModel = document.getElementById('model-select').value;
+            const inputField = document.getElementById('qa-input');
+            const questionText = inputField.value.trim();
+            const sendBtn = document.getElementById('qa-send-btn');
+            
+            if (!questionText) return;
+            if (!apiKey || !selectedModel) {
+                alert("API 키와 모델이 설정되어야 합니다.");
+                return;
+            }
+
+            appendQAMessage('user', questionText);
+            inputField.value = '';
+            inputField.disabled = true;
+            sendBtn.disabled = true;
+
+            const theoryKey = document.getElementById('network-theory').value;
+            const currentTheory = networkModels[theoryKey];
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+            
+            let contextBlock = '';
+            if (qaTargetActor && qaTargetText) {
+                contextBlock = `
+            [질문 대상 행위자] ${qaTargetActor.name}
+            [해당 발언 원문] "${qaTargetText}"
+            
+            사용자가 위 행위자의 발언에 대해 질문하고 있습니다. 
+            이 행위자가 왜 그렇게 발언했는지, 어떤 이해관계와 전략적 판단이 있었는지,
+            그리고 현재 적용된 이론 모형(${currentTheory.name})에서 이 행위자의 위치와 역할이 어떠한지를
+            설명해주세요.
+                `;
+            } else {
+                contextBlock = `
+            사용자가 시뮬레이션 전체 과정에 대해 질문하고 있습니다. 
+            각 주체의 행동 이유, 협상 흐름, 연합 가능성, 결과의 원인, 현실과의 비교 등 
+            시뮬레이션 전반에 걸친 질문에 답변해주세요.
+            ${analysisHistory ? '이전 분석 결과\n' + analysisHistory : ''}
+                `;
+            }
+
+            const prompt = `
+            당신은 AI시대 공공정책 4강 강의 내용을 바탕으로 정책 네트워크 시뮬레이션 분석을 돕는 조교입니다. 이 시뮬레이션은 ${currentTheory.name} 이론 모형을 바탕으로 진행되었습니다.
+
+            [강의 핵심 개념 - 답변에 활용할 것]
+            - 비공식 참여자 유형: 이익집단(특수이익 표출), NGO(공익 추구), 정당(이익 결집), 전문가·싱크탱크(정책 대안 창출), 언론(의제 설정·여론 형성), 시민·여론
+            - 이익집단 영향력 요인: 경제력·자금력 / 구성원의 사회적 명성 / 정책결정자와의 친밀관계 / 집단의 규모 / 집단의 응집성
+            - 이익집단 형성 이론: 트루만(공동이익→집단 형성, 잠재적 집단, 중복회원) vs 올슨(무임승차, 선별적 인센티브)
+            - 정책 네트워크 모형 비교: 철의 삼각(소수·폐쇄·고응집) vs 정책공동체(광범·전문성 기반) vs 이슈 네트워크(매우 광범·유동·불안정)
+            - 관료 역할 차이: 철의 삼각=특수이익 종속 / 정책공동체=적극적 관료 / 이슈 네트워크=쟁점별 주도 또는 방관
+            
+            [시뮬레이션 이론 특징]
+            ${currentTheory.desc}
+            
+            [이 모형의 실제 작동 메커니즘]
+            ${currentTheory.mechanism}
+            
+            [전체 토론 기록]
+            ${chatHistory}
+            
+            ${contextBlock}
+            
+            질문: ${questionText}
+            
+            위 강의 개념과 시뮬레이션 기록을 바탕으로 질문에 명확하고 이해하기 쉽게 답변하세요.
+            특히 해당 행위자의 이해관계, 전략적 동기, 이론 모형에서의 구조적 위치를 연결하여 설명하고, 강의에서 배운 개념(트루만, 올슨, 이익집단 영향력 요인, NGO와 이익집단 차이 등)을 자연스럽게 활용하세요.
+            주의: 마크다운 기호를 절대 사용하지 마세요. 친절하고 객관적인 어조를 유지하세요.
+            `;
+
+            try {
+                const response = await fetchWithRetry(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        safetySettings: [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                        ]
+                    })
+                });
+                
+                if (!response.ok) throw new Error("답변 생성 중 오류가 발생했습니다.");
+                
+                const data = await response.json();
+                if (!data.candidates || data.candidates.length === 0) throw new Error("AI 응답 생성 실패");
+
+                let answerText = data.candidates[0].content.parts[0].text;
+                answerText = answerText.replace(/[*#_~`]/g, ''); 
+                
+                appendQAMessage('bot', answerText);
+
+            } catch (error) {
+                appendQAMessage('bot', `오류 발생: ${error.message}`);
+            } finally {
+                inputField.disabled = false;
+                sendBtn.disabled = false;
+                inputField.focus();
+            }
+        }
+
+        async function startSimulation() {
+            const apiKey = document.getElementById('api-key').value.trim();
+            if (!apiKey) {
+                alert("API 키를 입력해야 합니다.");
+                return;
+            }
+
+            const selectedModel = document.getElementById('model-select').value;
+            if (!selectedModel) {
+                alert("모델 불러오기를 먼저 실행해주세요.");
+                return;
+            }
+
+            const theoryKey = document.getElementById('network-theory').value;
+            const currentTheory = networkModels[theoryKey];
+
+            abortController = new AbortController();
+
+            startBtn.disabled = true;
+            stopBtn.style.display = 'block';
+            analyzeBtn.style.display = 'none';
+            generalQaBtn.style.display = 'none';
+            qaSection.classList.add('hidden');
+            qaBox.innerHTML = '';
+            qaContextDisplay.innerHTML = '';
+            outputBox.innerHTML = "";
+            chatHistory = "";
+            analysisHistory = "";
+            simulationStarted = false;
+            qaTargetActor = null;
+            qaTargetText = "";
+
+            actors.forEach((actor, index) => {
+                actor.desc = document.getElementById(`desc-${index}`).value;
+            });
+
+            appendMessage(null, null, `선택된 이론 모형: ${currentTheory.name} 시뮬레이션을 시작합니다.`, true);
+
+            try {
+                for (let i = 0; i < simulationSteps.length; i++) {
+                    await runStep(apiKey, simulationSteps[i], currentTheory);
+                    if (i < simulationSteps.length - 1) {
+                        await delay(8000);
+                    }
+                }
+                appendMessage(null, null, "시뮬레이션이 모두 종료되었습니다. 하단의 버튼을 눌러 결과를 분석하거나, 전체 과정에 대해 질문해 보세요.", true);
+                analyzeBtn.style.display = 'block';
+                generalQaBtn.style.display = 'block';
+            } catch (e) {
+                outputBox.querySelectorAll('.loading').forEach(el => el.remove());
+
+                if (e.name === 'AbortError') {
+                    appendMessage(null, null, "시뮬레이션이 강제 중단되었습니다. 다른 모델을 선택한 뒤 다시 시작하세요.", true);
+                } else {
+                    appendMessage(null, null, "오류로 인해 시뮬레이션이 중단되었습니다.", true);
+                }
+            } finally {
+                startBtn.disabled = false;
+                stopBtn.style.display = 'none';
+                abortController = null;
+            }
+        }
+
+        function saveAsText() {
+            const msgs = outputBox.querySelectorAll('.msg');
+            if (msgs.length === 0 || (msgs[0] && msgs[0].innerText.includes("API 키를 입력하고"))) {
+                alert("저장할 결과가 없습니다.");
+                return;
+            }
+
+            let textContent = "정책 시뮬레이션: AI 디지털교과서 결과\n\n";
+            msgs.forEach(msg => {
+                textContent += msg.innerText.replace('이 발언에 질문하기', '').trim() + "\n\n";
+            });
+
+            const qaMsgs = qaBox.querySelectorAll('.qa-msg');
+            if (qaMsgs.length > 0) {
+                textContent += "----------------------------------------\n";
+                textContent += "[질의응답 기록]\n\n";
+                qaMsgs.forEach(msg => {
+                    textContent += msg.innerText + "\n\n";
+                });
+            }
+
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `AI디지털교과서_시뮬레이션_결과_${new Date().getTime()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function saveAsPDF() {
+            const msgs = outputBox.querySelectorAll('.msg');
+            if (msgs.length === 0 || (msgs[0] && msgs[0].innerText.includes("API 키를 입력하고"))) {
+                alert("저장할 결과가 없습니다.");
+                return;
+            }
+            window.print();
+        }
+    </script>
+</body>
+</html>
